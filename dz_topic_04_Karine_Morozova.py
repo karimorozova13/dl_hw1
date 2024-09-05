@@ -26,7 +26,8 @@ warnings.filterwarnings('ignore')
 df = pd.read_csv('./ConcreteStrengthData.csv')
     
 # %%
-df.columns
+print(df.isnull().sum())
+
 
 # %%
 components = ['CementComponent ',
