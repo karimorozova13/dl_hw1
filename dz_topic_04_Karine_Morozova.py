@@ -28,6 +28,12 @@ df = pd.read_csv('./ConcreteStrengthData.csv')
 # %%
 print(df.isnull().sum())
 
+# %%
+df.describe()
+df['Strength'].hist()
+plt.title('Distribution of Concrete Strength')
+plt.show()
+
 
 # %%
 components = ['CementComponent ',
@@ -85,35 +91,10 @@ class LinearModel(nn.Module):
 model = LinearModel(in_dim=X_train.shape[1], out_dim=1)
   
 criterion = nn.MSELoss()
-optimizer = optim.SGD(model.parameters(), lr=0.01)
-    
-# train_losses = []
-# train_rmses = []
-# test_losses = []
-# test_rmses = []
+optimizer = optim.Adam(model.parameters(), lr=0.01)
 
 # %%
 
-# class ConcreteDataset(Dataset):
-#     def __init__(self, X, y, scale=True):        
-#         self.X = X.values # from Pandas DataFrame to NumPy array
-#         self.y = y
-        
-#         if scale:
-#             sc = StandardScaler()
-#             self.X = sc.fit_transform(self.X)
-
-#     def __len__(self):
-#         #return size of a dataset
-#         return len(self.y)
-
-#     def __getitem__(self, idx):
-#         #supports indexing using dataset[i] to get the i-th row in a dataset
-        
-#         X = torch.tensor(self.X[idx], dtype=torch.float32)
-#         y = torch.tensor(self.y[idx], dtype=torch.float32)        
-        
-#         return X, y
 batch_size = 32
 num_epochs = 100
 
@@ -172,9 +153,7 @@ for epoch in range(num_epochs):
         train_loss += loss.item()
         y_pred_train.extend(outputs.cpu().detach().numpy())
     
-    # Calculate RMSE for training set
-    # train_rmse = MSE(y_train, y_pred_train, squared=False)
-    # train_rmses.append(train_rmse)
+ 
     train_rmse = MSE(y_train, y_pred_train, squared=False)
     train_mae = MAE(y_train, y_pred_train)
     train_r2 = r2_score(y_train, y_pred_train)
@@ -197,9 +176,6 @@ for epoch in range(num_epochs):
             test_loss += loss.item()
             y_pred_test.extend(outputs.cpu().numpy())
 
-    # Calculate RMSE for test set
-    # test_rmse = MSE(y_test, y_pred_test, squared=False)
-    # test_rmses.append(test_rmse)
     test_rmse = MSE(y_test, y_pred_test, squared=False)
     test_mae = MAE(y_test, y_pred_test)
     test_r2 = r2_score(y_test, y_pred_test)
@@ -214,15 +190,65 @@ for epoch in range(num_epochs):
         print(f'Epoch [{epoch+1}/{num_epochs}], Train Loss: {train_losses[-1]:.4f}, Train RMSE: {train_rmse:.4f}, Test Loss: {test_losses[-1]:.4f}, Test RMSE: {test_rmse:.4f}')
 
 # %%
-# plt.figure(figsize=(4, 3))
-# plt.plot(train_losses, label='Train')
-# plt.plot(test_losses, label='Validation')
-# plt.legend(loc='best')
-# plt.xlabel('Epochs')
-# plt.ylabel('MAE')
-# plt.title('Training vs Validation Loss')
-# plt.show()
+import numpy as np
 
+for epoch in range(num_epochs):
+    model.train()
+    train_loss = 0
+    y_pred_train = []
+    y_true_train = []
+
+    for inputs, targets in train_dataloader:
+        # Forward pass
+        outputs = model(inputs)
+        loss = criterion(outputs, targets.unsqueeze(1))  # Match dimensions
+        
+        # Backward pass and optimization
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        train_loss += loss.item()
+        y_pred_train.extend(outputs.cpu().detach().numpy())
+        y_true_train.extend(targets.cpu().detach().numpy())
+
+    # Calculate metrics
+    train_rmse = np.sqrt(MSE(y_true_train, y_pred_train))
+    train_mae = MAE(y_true_train, y_pred_train)
+    train_r2 = r2_score(y_true_train, y_pred_train)
+    train_losses.append(train_loss / len(train_dataloader))
+    train_rmses.append(train_rmse)
+    train_maes.append(train_mae)
+    train_r2s.append(train_r2)
+    
+    model.eval()
+    test_loss = 0
+    y_pred_test = []
+    y_true_test = []
+
+    with torch.no_grad():
+        for inputs, targets in test_dataloader:
+            outputs = model(inputs)
+            loss = criterion(outputs, targets.unsqueeze(1))
+            
+            test_loss += loss.item()
+            y_pred_test.extend(outputs.cpu().numpy())
+            y_true_test.extend(targets.cpu().numpy())
+
+    # Calculate metrics
+    test_rmse = np.sqrt(MSE(y_true_test, y_pred_test))
+    test_mae = MAE(y_true_test, y_pred_test)
+    test_r2 = r2_score(y_true_test, y_pred_test)
+    test_losses.append(test_loss / len(test_dataloader))
+    test_rmses.append(test_rmse)
+    test_maes.append(test_mae)
+    test_r2s.append(test_r2)
+    
+    # Print progress every 5 epochs
+    if (epoch + 1) % 5 == 0:
+        print(f'Epoch [{epoch+1}/{num_epochs}], Train Loss: {train_losses[-1]:.4f}, Train RMSE: {train_rmse:.4f}, Train MAE: {train_mae:.4f}, Train R²: {train_r2:.4f}, Test Loss: {test_losses[-1]:.4f}, Test RMSE: {test_rmse:.4f}, Test MAE: {test_mae:.4f}, Test R²: {test_r2:.4f}')
+
+# %%
 
 # 6. Model Evaluation
 # 6.1 Plot loss curves
